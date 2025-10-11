@@ -1,0 +1,23 @@
+{
+  "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+  "vulnerability_type": "SQL Injection",
+  "context_functions": [
+    "None",
+    "None",
+    "None"
+  ],
+  "dataflow_info": {
+    "source": "req.query.name",
+    "sink": "db.query"
+  },
+  "poc": [
+    "GET /admin/user?name=' OR '1'='1"
+  ],
+  "confidence": 0.95,
+  "edge_cases": [
+    "Input sanitization"
+  ],
+  "suggested_fixes": [
+    "Use parameterized queries"
+  ]
+}

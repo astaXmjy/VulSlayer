@@ -1,0 +1,29 @@
+{
+  "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\middleware\\auth.js",
+  "vulnerability_type": "Timing Side-Channel",
+  "context_functions": [
+    "None"
+  ],
+  "dataflow_info": {
+    "source": "req.headers['x-token']",
+    "propagation": [
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\middleware\\auth.js",
+        "snippet": "const t = req.headers['x-token'] || '';\n  let ok = true;\n  // naive comparison (timing side-channel)\n  if (t.length !== SECRET.length) ok = false;\n  for (let i = 0; i < SECRET.length; i++) {\n    if (t[i] !== SECRET[i]) { ok = false; break; }\n  }",
+        "start_line": 4,
+        "end_line": 9
+      }
+    ],
+    "sink": "auth function"
+  },
+  "poc": [
+    "Measure response time for different tokens"
+  ],
+  "confidence": 0.8,
+  "edge_cases": [
+    "Token length check"
+  ],
+  "suggested_fixes": [
+    "Use constant-time comparison"
+  ]
+}

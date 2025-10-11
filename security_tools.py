@@ -7,18 +7,18 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional, ClassVar, Pattern
+from typing import ClassVar, Optional, Pattern
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field, ValidationError
 
 from models import (
-    FileMeta,
-    FileDiscoveryResult,
-    ContextSnippet,
-    ConvergedFinding,
-    VulnerabilityJSON,
     AggregateMarkdown,
+    ConvergedFinding,
+    ContextSnippet,
+    FileDiscoveryResult,
+    FileMeta,
+    VulnerabilityJSON,
 )
 
 # ---------------------------
@@ -31,17 +31,26 @@ def _is_under_any(path: Path, folders: tuple[str, ...]) -> bool:
     parts = set(path.parts)
     return any(x in parts for x in folders)
 
+def _safe_name(file_path: str, vuln_type: str) -> str:
+    return (
+        f"{Path(file_path).name}_{vuln_type}"
+        .replace(" ", "_").replace("/", "_").replace("\\", "_")
+    )
+
 # ---------------------------
 # FileSearchTool
 # ---------------------------
 class FileSearchToolSchema(BaseModel):
     directory: str = Field(..., description="Root directory to search from")
     extensions: Optional[list[str]] = Field(
-        default=None, description="File extensions to include; default includes code + html + json/yaml."
+        default=None,
+        description="File extensions to include; default includes code + html + json/yaml.",
     )
-    include_globs: Optional[list[str]] = Field(default=None, description="Glob patterns to include (relative to root).")
+    include_globs: Optional[list[str]] = Field(
+        default=None, description="Glob patterns to include (relative to root)."
+    )
     exclude_globs: Optional[list[str]] = Field(
-        default=["**/node_modules/**", "**/.venv/**", "**/venv/**", "**/dist/**", "**/build/**", "**/.git/**"],
+        default=["**/node_modules/**","**/.venv/**","**/venv/**","**/dist/**","**/build/**","**/.git/**"],
         description="Glob patterns to exclude (relative to root).",
     )
     max_size_bytes: int = Field(default=1_000_000, ge=1, description="Skip files larger than this (per file).")
@@ -52,15 +61,9 @@ class FileSearchTool(BaseTool):
     description: str = Field(default="Recursively lists source/support files with globs, size caps, and symlink control.")
     args_schema = FileSearchToolSchema
 
-    def _run(
-        self,
-        directory: str,
-        extensions: Optional[list[str]] = None,
-        include_globs: Optional[list[str]] = None,
-        exclude_globs: Optional[list[str]] = None,
-        max_size_bytes: int = 1_000_000,
-        follow_symlinks: bool = False,
-    ) -> dict:
+    def _run(self, directory: str, extensions: Optional[list[str]] = None,
+             include_globs: Optional[list[str]] = None, exclude_globs: Optional[list[str]] = None,
+             max_size_bytes: int = 1_000_000, follow_symlinks: bool = False) -> dict:
         root = Path(directory).resolve()
         if extensions is None:
             extensions = [
@@ -76,28 +79,20 @@ class FileSearchTool(BaseTool):
         files: list[FileMeta] = []
 
         def eligible(fp: Path) -> bool:
-            if not follow_symlinks and fp.is_symlink():
-                return False
-            if _is_under_any(fp, vendor_dirs):
-                return False
-            if exclude_globs and any(fp.match(g) for g in exclude_globs):
-                return False
-            if include_globs and not any(fp.match(g) for g in include_globs):
-                return False
-            if fp.suffix.lower() not in extensions:
-                return False
+            if not follow_symlinks and fp.is_symlink(): return False
+            if _is_under_any(fp, vendor_dirs): return False
+            if exclude_globs and any(fp.match(g) for g in exclude_globs): return False
+            if include_globs and not any(fp.match(g) for g in include_globs): return False
+            if fp.suffix.lower() not in extensions: return False
             try:
-                if fp.stat().st_size > max_size_bytes:
-                    return False
+                if fp.stat().st_size > max_size_bytes: return False
             except Exception:
                 return False
             return True
 
         for fp in root.rglob("*"):
-            if not fp.is_file():
-                continue
-            if not eligible(fp):
-                continue
+            if not fp.is_file(): continue
+            if not eligible(fp): continue
             try:
                 text = fp.read_text(encoding="utf-8", errors="ignore")
                 line_count = text.count("\n") + 1
@@ -141,9 +136,7 @@ class UniversalReferenceToolSchema(BaseModel):
 
 class UniversalReferenceTool(BaseTool):
     name: str = Field(default="Universal Reference Tool")
-    description: str = Field(
-        default="Finds cross-file references (import/require/include/config reads) across languages; optional ripgrep accel."
-    )
+    description: str = Field(default="Finds cross-file references (import/require/include/config reads) across languages; optional ripgrep accel.")
     args_schema = UniversalReferenceToolSchema
 
     RE_REQUIRE: ClassVar[Pattern[str]] = re.compile(r"""require\s*\(\s*['"]([^'"]+)['"]\s*\)""")
@@ -158,15 +151,10 @@ class UniversalReferenceTool(BaseTool):
     RE_SQL_FILE: ClassVar[Pattern[str]] = re.compile(r"""(SOURCE|\.read)\s+['"]([^'"]+\.sql)['"]""", re.IGNORECASE)
 
     def _resolve_rel(self, base: Path, ref: str) -> Optional[str]:
-        if not ref or not ref.startswith("."):
-            return None
-        candidates = [
-            base.parent / (ref + ext)
-            for ext in (".js", ".ts", ".jsx", ".tsx", ".json", ".py", ".php", ".java", ".go", ".rb", ".c", ".cpp", ".h", ".html")
-        ] + [base.parent / ref]
+        if not ref or not ref.startswith("."): return None
+        candidates = [base.parent / (ref + ext) for ext in (".js",".ts",".jsx",".tsx",".json",".py",".php",".java",".go",".rb",".c",".cpp",".h",".html")] + [base.parent / ref]
         for c in candidates:
-            if c.exists():
-                return str(c.resolve())
+            if c.exists(): return str(c.resolve())
         return None
 
     def _scan_text(self, fp: Path, text: str) -> list[dict]:
@@ -204,8 +192,7 @@ class UniversalReferenceTool(BaseTool):
         cmd.append(str(root))
         try:
             out = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-            if out.returncode not in (0, 1):
-                return []
+            if out.returncode not in (0, 1): return []
             return [line.strip() for line in out.stdout.splitlines() if line.strip()]
         except Exception:
             return []
@@ -213,10 +200,8 @@ class UniversalReferenceTool(BaseTool):
     def _run(self, file_path: str, content: Optional[str] = None, accelerate_scan: bool = True) -> dict:
         fp = Path(file_path).resolve()
         if content is None:
-            try:
-                content = fp.read_text(encoding="utf-8", errors="ignore")
-            except Exception:
-                content = ""
+            try: content = fp.read_text(encoding="utf-8", errors="ignore")
+            except Exception: content = ""
         refs = self._scan_text(fp, content)
 
         project_refs: list[str] = []
@@ -228,7 +213,7 @@ class UniversalReferenceTool(BaseTool):
         return {"file": str(fp), "references": refs, "accelerated_candidates": project_refs}
 
 # ---------------------------
-# ContextExtractionTool (now safe on missing files)
+# ContextExtractionTool (safe on missing files)
 # ---------------------------
 class ContextExtractionToolSchema(BaseModel):
     file_path: str
@@ -247,8 +232,7 @@ class ContextExtractionTool(BaseTool):
             abs_fp = fp if fp.is_absolute() else (Path.cwd() / fp)
             exists = abs_fp.exists() and abs_fp.is_file()
         except Exception:
-            abs_fp = Path(file_path)
-            exists = False
+            abs_fp = Path(file_path); exists = False
 
         if not exists:
             return {"snippets": [], "ok": False, "warning": f"File not found: {abs_fp}"}
@@ -262,8 +246,7 @@ class ContextExtractionTool(BaseTool):
 
         if lines:
             for ln in lines:
-                start = max(ln - window, 1)
-                end = min(ln + window, len(content))
+                start = max(ln - window, 1); end = min(ln + window, len(content))
                 snippet = "\n".join(content[start - 1 : end])
                 if snippet.strip():
                     snippets.append(ContextSnippet(file_path=str(abs_fp), snippet=snippet, start_line=start, end_line=end))
@@ -274,8 +257,7 @@ class ContextExtractionTool(BaseTool):
                 idx = joined.find(sym)
                 if idx >= 0:
                     ln = max(len(joined[:idx].splitlines()), 1)
-                    start = max(ln - window, 1)
-                    end = min(ln + window, len(content))
+                    start = max(ln - window, 1); end = min(ln + window, len(content))
                     snippet = "\n".join(content[start - 1 : end])
                     if snippet.strip():
                         snippets.append(ContextSnippet(file_path=str(abs_fp), symbol=sym, snippet=snippet, start_line=start, end_line=end))
@@ -284,10 +266,8 @@ class ContextExtractionTool(BaseTool):
         uniq, seen = [], set()
         for s in snippets:
             h = _sha1(f"{s.file_path}:{s.start_line}:{s.end_line}:{s.snippet[:120]}")
-            if h in seen:
-                continue
-            seen.add(h)
-            uniq.append(s)
+            if h in seen: continue
+            seen.add(h); uniq.append(s)
 
         return {"snippets": [s.model_dump() for s in uniq], "ok": True}
 
@@ -312,7 +292,28 @@ class TerminalCommandTool(BaseTool):
             return {"command": command, "return_code": -1, "stdout": "", "stderr": str(e), "success": False}
 
 # ---------------------------
-# VulnerabilityJSONWriter (v2-safe)
+# JSONBlobWriter — write arbitrary JSON to disk
+# ---------------------------
+class JSONBlobWriterSchema(BaseModel):
+    out_path: str
+    payload: dict
+
+class JSONBlobWriter(BaseTool):
+    name: str = Field(default="JSON Blob Writer")
+    description: str = Field(default="Writes an arbitrary JSON payload to a specific file path (UTF-8).")
+    args_schema = JSONBlobWriterSchema
+
+    def _run(self, out_path: str, payload: dict) -> dict:
+        fp = Path(out_path)
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            fp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            return {"path": str(fp), "ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+# ---------------------------
+# VulnerabilityJSONWriter — per-vuln simplified JSON
 # ---------------------------
 class VulnerabilityJSONWriterSchema(BaseModel):
     out_dir: str
@@ -328,7 +329,7 @@ class VulnerabilityJSONWriter(BaseTool):
         try:
             conv = ConvergedFinding.model_validate(converged)
             payload = VulnerabilityJSON.from_converged(conv)
-            safe_name = (f"{Path(payload.file).name}_{payload.vulnerability_type}".replace(" ", "_").replace("/", "_").replace("\\", "_"))
+            safe_name = _safe_name(payload.file, payload.vulnerability_type)
             fp = Path(out_dir) / f"{safe_name}.json"
             fp.write_text(payload.model_dump_json(indent=2), encoding="utf-8")
             return {"path": str(fp), "ok": True}
@@ -336,7 +337,7 @@ class VulnerabilityJSONWriter(BaseTool):
             return {"ok": False, "error": ve.errors()}
 
 # ---------------------------
-# AggregateMarkdownWriter
+# AggregateMarkdownWriter — returns json_paths for convenience
 # ---------------------------
 class AggregateMarkdownWriterSchema(BaseModel):
     json_dir: str
@@ -350,10 +351,13 @@ class AggregateMarkdownWriter(BaseTool):
     def _run(self, json_dir: str, out_path: str = "security_output/report.md") -> dict:
         jd = Path(json_dir)
         vulns: list[VulnerabilityJSON] = []
+        used_paths: list[str] = []
+
         for jf in jd.glob("*.json"):
             try:
                 data = json.loads(jf.read_text(encoding="utf-8"))
                 vulns.append(VulnerabilityJSON.model_validate(data))
+                used_paths.append(str(jf.resolve()))
             except Exception:
                 continue
 
@@ -364,10 +368,11 @@ class AggregateMarkdownWriter(BaseTool):
         summary = {"total_files_analyzed": 0, "total_findings": len(vulns), "by_type": by_type}
         agg = AggregateMarkdown.model_validate({"summary": summary, "vulnerabilities": [v.model_dump() for v in vulns]})
 
-        lines: list[str] = [
-            "# Security Analysis Report", "", "## Executive Summary",
-            f"- Total findings: **{agg.summary.total_findings}**",
-        ]
+        lines: list[str] = []
+        lines.append("# Security Analysis Report")
+        lines.append("")
+        lines.append("## Executive Summary")
+        lines.append(f"- Total findings: **{agg.summary.total_findings}**")
         if agg.summary.by_type:
             lines.append("- Findings by type:")
             for k, v in agg.summary.by_type.items():
@@ -378,13 +383,15 @@ class AggregateMarkdownWriter(BaseTool):
             lines.append(f"### {v.vulnerability_type} — `{v.file}`")
             if v.poc:
                 lines.append(f"- **PoC(s):**")
-                lines += [f"  - {p}" for p in v.poc]
+                for p in v.poc:
+                    lines.append(f"  - {p}")
             lines.append(f"- **Confidence:** {v.confidence}")
             if v.edge_cases:
                 lines.append(f"- **Edge cases:** " + ", ".join(v.edge_cases))
             if v.suggested_fixes:
                 lines.append(f"- **Suggested fixes:**")
-                lines += [f"  - {s}" for s in v.suggested_fixes]
+                for s in v.suggested_fixes:
+                    lines.append(f"  - {s}")
             if v.dataflow_info:
                 lines.append(f"- **Dataflow:** `{json.dumps(v.dataflow_info)}`")
             lines.append("")
@@ -392,4 +399,4 @@ class AggregateMarkdownWriter(BaseTool):
         outp = Path(out_path)
         outp.parent.mkdir(parents=True, exist_ok=True)
         outp.write_text("\n".join(lines), encoding="utf-8")
-        return {"path": str(outp), "count": len(vulns), "ok": True}
+        return {"path": str(outp), "count": len(vulns), "json_paths": used_paths, "ok": True}

@@ -1,0 +1,131 @@
+{
+  "final": {
+    "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+    "vulnerability_type": "Unsafe Eval",
+    "code_snippet": "const out = eval(expr);",
+    "line_number": 18,
+    "impact": "High",
+    "confidence": 0.95,
+    "poc": [
+      "GET /admin/eval?expr=process.exit()"
+    ],
+    "edge_cases": [
+      "Input validation"
+    ],
+    "suggested_fixes": [
+      "Avoid using eval"
+    ],
+    "dataflow_info": {
+      "source": "req.query.expr",
+      "sink": "eval"
+    },
+    "related_context": [
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+        "symbol": "None",
+        "snippet": "const express = require('express');\nconst router = express.Router();\nconst db = require('../utils/db');\nconst { runReport } = require('../services/reportService');",
+        "start_line": 1,
+        "end_line": 5
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\utils\\db.js",
+        "symbol": "None",
+        "snippet": "const mysql = require('mysql');\nconst fs = require('fs');\n\n// First-layer context; reads second-layer config\nlet cfg = { host: 'localhost', user: 'root', password: '', database: 'test' };\ntry {\n  const flags = JSON.parse(fs.readFileSync('config/featureFlags.json', 'utf8'));\n  if (flags && flags.dbOverride) {\n    cfg = Object.assign(cfg, flags.dbOverride);\n  }\n} catch (e) { /* ignore */ }\n\nconst connection = mysql.createConnection(cfg);\n\nfunction query(sql, cb) {\n  // No query parameterization; for demo only\n  connection.query(sql, cb);\n}\n\nmodule.exports = { query };",
+        "start_line": 1,
+        "end_line": 20
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\services\\reportService.js",
+        "symbol": "None",
+        "snippet": "const { exec } = require('child_process');\nconst { shellWrap } = require('../helpers/shell');\n\n// Command injection via grep; nested context through helpers/shell.js\nfunction runReport(pattern, file) {\n  return new Promise((resolve, reject) => {\n    const cmd = \"grep \" + pattern + \" \" + file; // user-controlled\n    const wrapped = shellWrap(cmd); // adds flags from config/logger.json\n    exec(wrapped, (err, stdout, stderr) => {\n      if (err) return reject(err);\n      resolve({ stdout, stderr });\n    });\n  });\n}\n\nmodule.exports = { runReport };",
+        "start_line": 1,
+        "end_line": 16
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\helpers\\shell.js",
+        "symbol": "None",
+        "snippet": "const fs = require('fs');\n\n// Reads extra flags from config/logger.json (second-layer context)\nfunction shellWrap(cmd) {\n  let extra = \"\";\n  try {\n    const raw = fs.readFileSync('config/logger.json', 'utf8');\n    const cfg = JSON.parse(raw);\n    if (cfg && cfg.appendGrepFlags) {\n      extra = \" \" + cfg.appendGrepFlags.join(\" \");\n    }\n  } catch (e) {\n    // ignore\n  }\n  return cmd + extra; // no escaping/sanitization\n}\n\nmodule.exports = { shellWrap };",
+        "start_line": 1,
+        "end_line": 18
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\config\\logger.json",
+        "symbol": "None",
+        "snippet": "{\n  \"debug\": true,\n  \"appendGrepFlags\": [\n    \"-n\",\n    \"--color=never\"\n  ]\n}",
+        "start_line": 1,
+        "end_line": 7
+      }
+    ]
+  },
+  "iterations": 5,
+  "converged_reason": "Additional context from db.js, reportService.js, shell.js, and logger.json was gathered, and the confidence in the vulnerability was increased.",
+  "lineage": [
+    {
+      "finding": {
+        "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+        "vulnerability_type": "Unsafe Eval",
+        "code_snippet": "const out = eval(expr);",
+        "line_number": 18,
+        "impact": "High",
+        "confidence": 0.9,
+        "poc": [
+          "GET /admin/eval?expr=process.exit()"
+        ],
+        "edge_cases": [
+          "Input validation"
+        ],
+        "suggested_fixes": [
+          "Avoid using eval"
+        ],
+        "dataflow_info": {
+          "source": "req.query.expr",
+          "sink": "eval"
+        },
+        "related_context": [
+          {
+            "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+            "symbol": "None",
+            "snippet": "const express = require('express');\nconst router = express.Router();\nconst db = require('../utils/db');\nconst { runReport } = require('../services/reportService');",
+            "start_line": 1,
+            "end_line": 5
+          }
+        ]
+      },
+      "updated_dataflow_info": {},
+      "new_context": [
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\utils\\db.js",
+          "symbol": "None",
+          "snippet": "const mysql = require('mysql');\nconst fs = require('fs');\n\n// First-layer context; reads second-layer config\nlet cfg = { host: 'localhost', user: 'root', password: '', database: 'test' };\ntry {\n  const flags = JSON.parse(fs.readFileSync('config/featureFlags.json', 'utf8'));\n  if (flags && flags.dbOverride) {\n    cfg = Object.assign(cfg, flags.dbOverride);\n  }\n} catch (e) { /* ignore */ }\n\nconst connection = mysql.createConnection(cfg);\n\nfunction query(sql, cb) {\n  // No query parameterization; for demo only\n  connection.query(sql, cb);\n}\n\nmodule.exports = { query };",
+          "start_line": 1,
+          "end_line": 20
+        },
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\services\\reportService.js",
+          "symbol": "None",
+          "snippet": "const { exec } = require('child_process');\nconst { shellWrap } = require('../helpers/shell');\n\n// Command injection via grep; nested context through helpers/shell.js\nfunction runReport(pattern, file) {\n  return new Promise((resolve, reject) => {\n    const cmd = \"grep \" + pattern + \" \" + file; // user-controlled\n    const wrapped = shellWrap(cmd); // adds flags from config/logger.json\n    exec(wrapped, (err, stdout, stderr) => {\n      if (err) return reject(err);\n      resolve({ stdout, stderr });\n    });\n  });\n}\n\nmodule.exports = { runReport };",
+          "start_line": 1,
+          "end_line": 16
+        },
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\helpers\\shell.js",
+          "symbol": "None",
+          "snippet": "const fs = require('fs');\n\n// Reads extra flags from config/logger.json (second-layer context)\nfunction shellWrap(cmd) {\n  let extra = \"\";\n  try {\n    const raw = fs.readFileSync('config/logger.json', 'utf8');\n    const cfg = JSON.parse(raw);\n    if (cfg && cfg.appendGrepFlags) {\n      extra = \" \" + cfg.appendGrepFlags.join(\" \");\n    }\n  } catch (e) {\n    // ignore\n  }\n  return cmd + extra; // no escaping/sanitization\n}\n\nmodule.exports = { shellWrap };",
+          "start_line": 1,
+          "end_line": 18
+        },
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\config\\logger.json",
+          "symbol": "None",
+          "snippet": "{\n  \"debug\": true,\n  \"appendGrepFlags\": [\n    \"-n\",\n    \"--color=never\"\n  ]\n}",
+          "start_line": 1,
+          "end_line": 7
+        }
+      ],
+      "updated_pocs": [],
+      "updated_suggested_fixes": [],
+      "updated_confidence": 0.95,
+      "notes": "Added context from db.js, reportService.js, shell.js, and logger.json, increased confidence."
+    }
+  ]
+}

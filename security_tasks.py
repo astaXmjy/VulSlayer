@@ -1,20 +1,27 @@
 # security_tasks.py
 from __future__ import annotations
 
+import json
 from crewai import Task
 from config import SecurityAnalysisConfig
-from models import VulnFinding, DeepDivePass, ConvergedFinding
-from security_agents import SecurityAgents
+from models import (
+    FileDiscoveryResult,
+    FindingsList,
+    ConvergedFinding,
+    ReportArtifacts,
+    VulnFinding,
+)
 
 MAX_ITERATIONS = SecurityAnalysisConfig.MAX_DEEPDIVE_ITER
+
 
 class SecurityTasks:
     def __init__(self, target_directory: str = "."):
         self.target_directory = target_directory
-        self.agents = SecurityAgents()
 
-    def file_discovery_task(self):
-        agent = self.agents.create_file_discovery_agent()
+    # 1) Inventory
+    def file_discovery_task(self, agents):
+        agent = agents.create_file_discovery_agent()
         return Task(
             description=(
                 f"Enumerate source and relevant support files in {self.target_directory} "
@@ -22,11 +29,13 @@ class SecurityTasks:
                 f"FileDiscoveryResult. Do not analyze; only list files and metadata."
             ),
             agent=agent,
-            expected_output="JSON-serializable dict matching FileDiscoveryResult schema.",
+            expected_output="JSON-serializable object matching FileDiscoveryResult schema.",
+            output_pydantic=FileDiscoveryResult,
         )
 
-    def vulnerability_analysis_task(self):
-        agent = self.agents.create_vulnerability_analyzer_agent()
+    # 2) Initial vulnerability analysis
+    def vulnerability_analysis_task(self, agents):
+        agent = agents.create_vulnerability_analyzer_agent()
         return Task(
             description="""
 RULES:
@@ -43,70 +52,97 @@ Must DO:
    around the relevant reference lines; add those as related_context.
 4) Keep only the smallest necessary context windows; do NOT paste entire files.
 
-For each finding include:
-- vulnerability_type, file, code_snippet, optional line_number,
-- potential impact, confidence [0..1],
-- poc list, edge_cases list, suggested_fixes,
-- minimal related_context (ContextSnippet[]).
+PERSISTENCE (MANDATORY):
+- After assembling the full FindingsList, call JSON Blob Writer with:
+    out_path="security_output/first_pass_findings.json"
+    payload=<the exact FindingsList object>
+- This file will be used to spawn per-vulnerability deep-dive tasks.
 
-Also check:
-- HTML/templates for XSS (e.g., direct innerHTML/unsafe DOM sinks).
-- middleware/auth for hardcoded secrets and naive/timing-sensitive comparisons.
-- logging utilities for concatenation of user-supplied strings and config-driven toggles.
+Output the FindingsList as your final answer as well.
 """.strip(),
             agent=agent,
-            expected_output="List[dict] matching VulnFinding schema.",
+            expected_output="List of VulnFinding in a strict schema (wrapped).",
+            output_pydantic=FindingsList,
         )
 
-    def deepdive_iteration_task(self):
-        agent = self.agents.create_deepdive_agent()
+    # 3) Per-vulnerability deep-dive task factory
+    def deepdive_per_finding_task(self, agents, finding: VulnFinding):
+        """
+        Creates a Task that processes ONE VulnFinding, converges it, and persists:
+          - simplified per-vuln JSON to security_output/vulns/
+          - full ConvergedFinding JSON to security_output/converged/
+        """
+        agent = agents.create_deepdive_agent()
+        finding_json = json.dumps(finding.model_dump(), indent=2)
         return Task(
             description=f"""
+You are given ONE vulnerability to refine and converge, then persist artifacts.
+
+INPUT FINDING (strict JSON):
+{finding_json}
+
+GOALS:
+- Iterate (up to {MAX_ITERATIONS}) using UniversalReferenceTool + ContextExtractionTool to chase context-of-context.
+- Build a ConvergedFinding for this single vulnerability (include lineage of DeepDivePass items).
+- PERSIST artifacts:
+    1) Simplified per-vuln JSON: call Vulnerability JSON Writer with
+          out_dir="security_output/vulns"
+          converged=<your ConvergedFinding>
+    2) Full converged JSON: call JSON Blob Writer with
+          out_path="security_output/converged/<file_basename>_<vuln_type>.json"
+          payload=<your ConvergedFinding>
+
 RULES:
-- Only call tools with existing, discovered file paths. Do not invent 'path/to/...' placeholders.
-- If UniversalReferenceTool returns a target that does not exist, skip it.
+- Only use existing, discovered file paths. Do not invent 'path/to/...' placeholders.
+- Keep snippets minimal; never dump entire files.
 
-For each VulnFinding, run iterative refinement passes.
-
-In each pass, return DeepDivePass with:
-- updated_dataflow_info, new_context, updated_pocs, updated_suggested_fixes,
-  updated_confidence, notes.
-
-If a snippet references another file (import/require/include or JSON/config read),
-call UniversalReferenceTool on the current file/snippet, then use ContextExtractionTool
-to pull a minimal snippet from EACH newly identified referenced file; repeat until no new
-context is discovered OR after {MAX_ITERATIONS} iterations.
-
-Produce a final ConvergedFinding per input finding, with lineage of DeepDivePass items.
+Return the SINGLE ConvergedFinding as your final answer.
 """.strip(),
             agent=agent,
-            expected_output="List[dict] matching ConvergedFinding schema.",
+            expected_output="A single ConvergedFinding (strict Pydantic).",
+            output_pydantic=ConvergedFinding,
         )
 
-    def dataflow_analysis_task(self):
-        agent = self.agents.create_dataflow_analyzer_agent()
+    # 4) Per-converged data-flow task factory
+    def dataflow_per_converged_task(self, agents, converged: ConvergedFinding):
+        agent = agents.create_dataflow_analyzer_agent()
+        conv_json = json.dumps(converged.model_dump(), indent=2)
         return Task(
-            description="""
-For each vulnerability, analyze data flow:
-- Source → Propagation → Sink paths
-- Trust boundaries crossed
-- Potential control-flow hijacks
-Use any context collected across files (file → file → config) to build an accurate chain.
+            description=f"""
+You are given ONE ConvergedFinding to enrich with data flow (Source→Propagation→Sink) and persist.
 
-Return updated ConvergedFinding objects with dataflow_info populated.
+INPUT CONVERGED FINDING (strict JSON):
+{conv_json}
+
+GOALS:
+- Analyze data flow (source, propagation steps, sink), trust boundaries, potential control-flow hijacks.
+- Update the ConvergedFinding accordingly.
+- PERSIST simplified per-vuln JSON: call Vulnerability JSON Writer with
+      out_dir="security_output/dataflow"
+      converged=<your ENRICHED ConvergedFinding>
+
+RULES:
+- Use minimal necessary snippets; only operate on existing paths.
+
+Return the SINGLE, ENRICHED ConvergedFinding as your final answer.
 """.strip(),
             agent=agent,
-            expected_output="List[dict] matching ConvergedFinding schema, with dataflow_info.",
+            expected_output="A single ConvergedFinding (strict Pydantic) with dataflow_info populated.",
+            output_pydantic=ConvergedFinding,
         )
 
-    def report_generation_task(self):
-        agent = self.agents.create_report_generator_agent()
+    # 5) Report from deep-dive JSONs
+    def report_generation_task(self, agents):
+        agent = agents.create_report_generator_agent()
         return Task(
             description="""
-Write one JSON file per vulnerability (VulnerabilityJSON) and then create an aggregate
-Markdown report (report.md) combining them, including summaries, PoCs, snippets, fixes,
-and confidence. Ensure complete inclusion of all per-vuln JSONs.
+Read ALL per-vulnerability JSONs from security_output/vulns/ and create an aggregate
+Markdown report at security_output/report.md using AggregateMarkdownWriter.
+Do NOT derive from raw model output; derive strictly from JSON files to ensure reproducibility.
+
+Also return the list of JSON paths used and the final report path.
 """.strip(),
             agent=agent,
-            expected_output="Paths to created JSON files and the final report.md.",
+            expected_output="Paths to the deep-dive JSON files and the final report.md.",
+            output_pydantic=ReportArtifacts,
         )

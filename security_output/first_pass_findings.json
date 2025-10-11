@@ -1,0 +1,124 @@
+{
+  "items": [
+    {
+      "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+      "vulnerability_type": "SQL Injection",
+      "code_snippet": "const sql = \"SELECT * FROM users WHERE name = '\" + name + \"';\"",
+      "line_number": 9,
+      "impact": "High",
+      "confidence": 0.9,
+      "poc": [
+        "GET /admin/user?name=' OR '1'='1"
+      ],
+      "edge_cases": [
+        "Input sanitization"
+      ],
+      "suggested_fixes": [
+        "Use parameterized queries"
+      ],
+      "dataflow_info": {
+        "source": "req.query.name",
+        "sink": "db.query"
+      },
+      "related_context": [
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+          "symbol": "None",
+          "snippet": "const express = require('express');\nconst router = express.Router();\nconst db = require('../utils/db');\nconst { runReport } = require('../services/reportService');",
+          "start_line": 1,
+          "end_line": 5
+        }
+      ]
+    },
+    {
+      "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+      "vulnerability_type": "Unsafe Eval",
+      "code_snippet": "const out = eval(expr);",
+      "line_number": 18,
+      "impact": "High",
+      "confidence": 0.9,
+      "poc": [
+        "GET /admin/eval?expr=process.exit()"
+      ],
+      "edge_cases": [
+        "Input validation"
+      ],
+      "suggested_fixes": [
+        "Avoid using eval"
+      ],
+      "dataflow_info": {
+        "source": "req.query.expr",
+        "sink": "eval"
+      },
+      "related_context": [
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+          "symbol": "None",
+          "snippet": "const express = require('express');\nconst router = express.Router();\nconst db = require('../utils/db');\nconst { runReport } = require('../services/reportService');",
+          "start_line": 1,
+          "end_line": 5
+        }
+      ]
+    },
+    {
+      "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\file.js",
+      "vulnerability_type": "Path Traversal",
+      "code_snippet": "const finalPath = path.join(safeBase, userPath);",
+      "line_number": 9,
+      "impact": "High",
+      "confidence": 0.9,
+      "poc": [
+        "GET /file?path=../../etc/passwd"
+      ],
+      "edge_cases": [
+        "Path normalization"
+      ],
+      "suggested_fixes": [
+        "Use path.resolve and validate paths"
+      ],
+      "dataflow_info": {
+        "source": "req.query.path",
+        "sink": "fs.readFile"
+      },
+      "related_context": [
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\file.js",
+          "symbol": "None",
+          "snippet": "const router = express.Router();\nconst fs = require('fs');\nconst path = require('path');\n\n// Path traversal: GET /file?path=../../etc/passwd",
+          "start_line": 2,
+          "end_line": 6
+        }
+      ]
+    },
+    {
+      "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\middleware\\auth.js",
+      "vulnerability_type": "Timing Side-Channel",
+      "code_snippet": "if (t[i] !== SECRET[i]) { ok = false; break; }",
+      "line_number": 8,
+      "impact": "Medium",
+      "confidence": 0.8,
+      "poc": [
+        "Measure response time for different tokens"
+      ],
+      "edge_cases": [
+        "Token length check"
+      ],
+      "suggested_fixes": [
+        "Use constant-time comparison"
+      ],
+      "dataflow_info": {
+        "source": "req.headers['x-token']",
+        "sink": "auth function"
+      },
+      "related_context": [
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\middleware\\auth.js",
+          "symbol": "None",
+          "snippet": "\\nfunction auth(req, res, next) {\n  const t = req.headers['x-token'] || '';\n  let ok = true;\n  // naive comparison (timing side-channel)",
+          "start_line": 3,
+          "end_line": 7
+        }
+      ]
+    }
+  ]
+}

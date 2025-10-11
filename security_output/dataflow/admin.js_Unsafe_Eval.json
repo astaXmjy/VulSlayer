@@ -1,0 +1,57 @@
+{
+  "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+  "vulnerability_type": "Unsafe Eval",
+  "context_functions": [
+    "None",
+    "None",
+    "None",
+    "None",
+    "None"
+  ],
+  "dataflow_info": {
+    "source": "req.query.expr",
+    "propagation": [
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+        "snippet": "const expr = req.query.expr || \"\";\ntry {\n  const out = eval(expr); // DANGEROUS",
+        "start_line": 16,
+        "end_line": 19
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\utils\\db.js",
+        "snippet": "const flags = JSON.parse(fs.readFileSync('config/featureFlags.json', 'utf8'));\nif (flags && flags.dbOverride) {\ncfg = Object.assign(cfg, flags.dbOverride);",
+        "start_line": 6,
+        "end_line": 9
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\services\\reportService.js",
+        "snippet": "const cmd = \"grep \" + pattern + \" \" + file; // user-controlled\nconst wrapped = shellWrap(cmd); // adds flags from config/logger.json\nexec(wrapped, (err, stdout, stderr) => {\n  if (err) return reject(err);\n  resolve({ stdout, stderr });\n});",
+        "start_line": 10,
+        "end_line": 15
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\helpers\\shell.js",
+        "snippet": "const raw = fs.readFileSync('config/logger.json', 'utf8');\nconst cfg = JSON.parse(raw);\nif (cfg && cfg.appendGrepFlags) {\n  extra = \" \" + cfg.appendGrepFlags.join(\" \");\n}",
+        "start_line": 7,
+        "end_line": 12
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\config\\logger.json",
+        "snippet": "\"appendGrepFlags\": [\n  \"-n\",\n  \"--color=never\"\n]",
+        "start_line": 3,
+        "end_line": 5
+      }
+    ],
+    "sink": "eval"
+  },
+  "poc": [
+    "GET /admin/eval?expr=process.exit()"
+  ],
+  "confidence": 0.95,
+  "edge_cases": [
+    "Input validation"
+  ],
+  "suggested_fixes": [
+    "Avoid using eval"
+  ]
+}

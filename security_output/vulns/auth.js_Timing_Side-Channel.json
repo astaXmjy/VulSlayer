@@ -1,0 +1,21 @@
+{
+  "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\middleware\\auth.js",
+  "vulnerability_type": "Timing Side-Channel",
+  "context_functions": [
+    "None"
+  ],
+  "dataflow_info": {
+    "source": "req.headers['x-token']",
+    "sink": "auth function"
+  },
+  "poc": [
+    "Measure response time for different tokens"
+  ],
+  "confidence": 0.8,
+  "edge_cases": [
+    "Token length check"
+  ],
+  "suggested_fixes": [
+    "Use constant-time comparison"
+  ]
+}

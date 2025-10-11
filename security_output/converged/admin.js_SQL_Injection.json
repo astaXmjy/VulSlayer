@@ -1,0 +1,103 @@
+{
+  "final": {
+    "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+    "vulnerability_type": "SQL Injection",
+    "code_snippet": "const sql = \"SELECT * FROM users WHERE name = '\" + name + \"';\"",
+    "line_number": 9,
+    "impact": "High",
+    "confidence": 0.95,
+    "poc": [
+      "GET /admin/user?name=' OR '1'='1"
+    ],
+    "edge_cases": [
+      "Input sanitization"
+    ],
+    "suggested_fixes": [
+      "Use parameterized queries"
+    ],
+    "dataflow_info": {
+      "source": "req.query.name",
+      "sink": "db.query"
+    },
+    "related_context": [
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+        "symbol": "None",
+        "snippet": "const express = require('express');\nconst router = express.Router();\nconst db = require('../utils/db');\nconst { runReport } = require('../services/reportService');",
+        "start_line": 1,
+        "end_line": 5
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\utils\\db.js",
+        "symbol": "None",
+        "snippet": "let cfg = { host: 'localhost', user: 'root', password: '', database: 'test' };\ntry {\n  const flags = JSON.parse(fs.readFileSync('config/featureFlags.json', 'utf8'));\n  if (flags && flags.dbOverride) {\n    cfg = Object.assign(cfg, flags.dbOverride);",
+        "start_line": 5,
+        "end_line": 9
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\config\\featureFlags.json",
+        "symbol": "None",
+        "snippet": "{\n  \"dbOverride\": {\n    \"host\": \"localhost\",\n    \"user\": \"root\",\n    \"password\": \"\",\n    \"database\": \"demo\"\n  }\n}",
+        "start_line": 1,
+        "end_line": 7
+      }
+    ]
+  },
+  "iterations": 4,
+  "converged_reason": "Additional context from db.js and featureFlags.json was gathered, and the confidence in the vulnerability was increased.",
+  "lineage": [
+    {
+      "finding": {
+        "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+        "vulnerability_type": "SQL Injection",
+        "code_snippet": "const sql = \"SELECT * FROM users WHERE name = '\" + name + \"';\"",
+        "line_number": 9,
+        "impact": "High",
+        "confidence": 0.9,
+        "poc": [
+          "GET /admin/user?name=' OR '1'='1"
+        ],
+        "edge_cases": [
+          "Input sanitization"
+        ],
+        "suggested_fixes": [
+          "Use parameterized queries"
+        ],
+        "dataflow_info": {
+          "source": "req.query.name",
+          "sink": "db.query"
+        },
+        "related_context": [
+          {
+            "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+            "symbol": "None",
+            "snippet": "const express = require('express');\nconst router = express.Router();\nconst db = require('../utils/db');\nconst { runReport } = require('../services/reportService');",
+            "start_line": 1,
+            "end_line": 5
+          }
+        ]
+      },
+      "updated_dataflow_info": {},
+      "new_context": [
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\utils\\db.js",
+          "symbol": "None",
+          "snippet": "let cfg = { host: 'localhost', user: 'root', password: '', database: 'test' };\ntry {\n  const flags = JSON.parse(fs.readFileSync('config/featureFlags.json', 'utf8'));\n  if (flags && flags.dbOverride) {\n    cfg = Object.assign(cfg, flags.dbOverride);",
+          "start_line": 5,
+          "end_line": 9
+        },
+        {
+          "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\config\\featureFlags.json",
+          "symbol": "None",
+          "snippet": "{\n  \"dbOverride\": {\n    \"host\": \"localhost\",\n    \"user\": \"root\",\n    \"password\": \"\",\n    \"database\": \"demo\"\n  }\n}",
+          "start_line": 1,
+          "end_line": 7
+        }
+      ],
+      "updated_pocs": [],
+      "updated_suggested_fixes": [],
+      "updated_confidence": 0.95,
+      "notes": "Added context from db.js and featureFlags.json, increased confidence."
+    }
+  ]
+}

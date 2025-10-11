@@ -1,0 +1,25 @@
+{
+  "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+  "vulnerability_type": "Unsafe Eval",
+  "context_functions": [
+    "None",
+    "None",
+    "None",
+    "None",
+    "None"
+  ],
+  "dataflow_info": {
+    "source": "req.query.expr",
+    "sink": "eval"
+  },
+  "poc": [
+    "GET /admin/eval?expr=process.exit()"
+  ],
+  "confidence": 0.95,
+  "edge_cases": [
+    "Input validation"
+  ],
+  "suggested_fixes": [
+    "Avoid using eval"
+  ]
+}

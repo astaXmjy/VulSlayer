@@ -1,0 +1,43 @@
+{
+  "file": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+  "vulnerability_type": "SQL Injection",
+  "context_functions": [
+    "None",
+    "None",
+    "None"
+  ],
+  "dataflow_info": {
+    "source": "req.query.name",
+    "propagation": [
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\routes\\admin.js",
+        "snippet": "const name = req.query.name || '';\nconst sql = \"SELECT * FROM users WHERE name = '\" + name + \"';\"",
+        "start_line": 8,
+        "end_line": 9
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\utils\\db.js",
+        "snippet": "const flags = JSON.parse(fs.readFileSync('config/featureFlags.json', 'utf8'));\nif (flags && flags.dbOverride) {\ncfg = Object.assign(cfg, flags.dbOverride);",
+        "start_line": 6,
+        "end_line": 9
+      },
+      {
+        "file_path": "C:\\Users\\Ashish Yadav\\Downloads\\vulnerable_node_context_nesting\\vulnerable_node_context_nesting\\config\\featureFlags.json",
+        "snippet": "\"dbOverride\": {\n\"host\": \"localhost\",\n\"user\": \"root\",\n\"password\": \"\",\n\"database\": \"demo\"\n}",
+        "start_line": 2,
+        "end_line": 6
+      }
+    ],
+    "sink": "db.query"
+  },
+  "poc": [
+    "GET /admin/user?name=' OR '1'='1"
+  ],
+  "confidence": 0.95,
+  "edge_cases": [
+    "Input sanitization"
+  ],
+  "suggested_fixes": [
+    "Use parameterized queries"
+  ]
+}
